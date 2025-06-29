@@ -1,0 +1,12 @@
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+.dvc/cache/
+.dvc/tmp/
+*.log
+models/*.pkl
+data/*.csv
+!data/.gitkeep
+!models/.gitkeep
+.venv/

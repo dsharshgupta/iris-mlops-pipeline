@@ -1,0 +1,63 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run data validation tests
+      run: |
+        python -m pytest tests/test_data_validation.py -v
+    
+    - name: Run model evaluation tests
+      run: |
+        python -m pytest tests/test_model_evaluation.py -v
+    
+    - name: Setup CML
+      uses: iterative/setup-cml@v1
+    
+    - name: Create CML report
+      env:
+        REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Run the pipeline
+        python src/data_loader.py
+        python src/train_model.py
+        python src/evaluate_model.py
+        
+        # Create report
+        echo "## Model Performance Report" > report.md
+        echo "" >> report.md
+        echo "### Training Metrics" >> report.md
+        python -c "import json; m = json.load(open('models/metrics.json')); print(f'- Accuracy: {m[\"accuracy\"]:.4f}')" >> report.md
+        echo "" >> report.md
+        echo "### Evaluation Metrics" >> report.md
+        python -c "import json; m = json.load(open('models/evaluation_metrics.json')); print(f'- Accuracy: {m[\"full_dataset_accuracy\"]:.4f}\\n- Precision: {m[\"precision\"]:.4f}\\n- Recall: {m[\"recall\"]:.4f}\\n- F1-Score: {m[\"f1_score\"]:.4f}')" >> report.md
+        echo "" >> report.md
+        echo "### Confusion Matrix" >> report.md
+        echo '![](./models/confusion_matrix.png)' >> report.md
+        
+        cml comment create report.md
