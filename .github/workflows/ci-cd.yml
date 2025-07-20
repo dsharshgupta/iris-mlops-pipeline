@@ -69,5 +69,6 @@ jobs:
       uses: google-github-actions/upload-cloud-storage@v2
       with:
         path: models/
-        destination: gs://mlops-course-wide-link-461605-p9-unique/${{ github.run_id }}/
+        destination: mlops-course-wide-link-461605-p9-unique/${{ github.run_id }}/
         parent: false
+
