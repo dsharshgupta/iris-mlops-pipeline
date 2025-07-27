@@ -8,8 +8,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test-and-train:
     runs-on: ubuntu-latest
+    env:
+      # Using a file-based backend for MLflow tracking metadata
+      MLFLOW_TRACKING_URI: "file:./mlruns"
+      # GCS bucket for storing MLflow artifacts (from your notebook)
+      MLFLOW_ARTIFACT_ROOT: "gs://mlops-course-wide-link-461605-p9-unique/mlflow-artifacts"
+
     permissions:
       contents: write
       pull-requests: write
@@ -33,22 +39,32 @@ jobs:
 
     - name: Run model evaluation tests
       run: python -m pytest tests/test_model_evaluation.py -v
+      
+    - name: Authenticate with GCP
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+    
+    # This environment variable is now used by MLflow to access GCS
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
 
     - name: Setup CML
       uses: iterative/setup-cml@v1
 
-    - name: Run ML pipeline and generate report
+    - name: Run ML pipeline with MLflow and generate report
       run: |
         python src/data_loader.py
         python src/train_model.py
         python src/evaluate_model.py
 
+        # The CML report remains the same
         echo "## Model Performance Report" > report.md
         echo "" >> report.md
-        echo "### Training Metrics" >> report.md
+        echo "### Training Metrics (on test split)" >> report.md
         python -c "import json; m = json.load(open('models/metrics.json')); print(f'- Accuracy: {m[\"accuracy\"]:.4f}')" >> report.md
         echo "" >> report.md
-        echo "### Evaluation Metrics" >> report.md
+        echo "### Evaluation Metrics (on full dataset)" >> report.md
         python -c "import json; m = json.load(open('models/evaluation_metrics.json')); print(f'- Accuracy: {m[\"full_dataset_accuracy\"]:.4f}\\n- Precision: {m[\"precision\"]:.4f}\\n- Recall: {m[\"recall\"]:.4f}\\n- F1-Score: {m[\"f1_score\"]:.4f}')" >> report.md
         echo "" >> report.md
         echo "### Confusion Matrix" >> report.md
@@ -60,15 +76,9 @@ jobs:
       run: |
         cml comment create report.md
 
-    - name: Authenticate with GCP
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
-
-    - name: Upload artifacts to GCS
+    - name: Upload DVC artifacts to GCS (Optional, for DVC remote)
       uses: google-github-actions/upload-cloud-storage@v2
       with:
         path: models/
-        destination: mlops-course-wide-link-461605-p9-unique/${{ github.run_id }}/
+        destination: mlops-course-wide-link-461605-p9-unique/dvc-artifacts/${{ github.run_id }}/
         parent: false
-
