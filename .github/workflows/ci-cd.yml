@@ -11,9 +11,9 @@ jobs:
   test-and-train:
     runs-on: ubuntu-latest
     env:
-      # Using a file-based backend for MLflow tracking metadata
-      MLFLOW_TRACKING_URI: "file:./mlruns"
-      # GCS bucket for storing MLflow artifacts (from your notebook)
+      # Use the secret for the remote MLflow tracking server URI
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      # GCS bucket for storing MLflow artifacts
       MLFLOW_ARTIFACT_ROOT: "gs://mlops-course-wide-link-461605-p9-unique/mlflow-artifacts"
 
     permissions:
@@ -22,7 +22,8 @@ jobs:
       issues: write
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -45,7 +46,6 @@ jobs:
       with:
         credentials_json: '${{ secrets.GCP_SA_KEY }}'
     
-    # This environment variable is now used by MLflow to access GCS
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
@@ -54,11 +54,12 @@ jobs:
 
     - name: Run ML pipeline with MLflow and generate report
       run: |
+        # These scripts are now updated to handle MLflow logging
         python src/data_loader.py
         python src/train_model.py
         python src/evaluate_model.py
 
-        # The CML report remains the same
+        # Generate the CML report markdown file
         echo "## Model Performance Report" > report.md
         echo "" >> report.md
         echo "### Training Metrics (on test split)" >> report.md
@@ -70,15 +71,8 @@ jobs:
         echo "### Confusion Matrix" >> report.md
         echo '![](./models/confusion_matrix.png)' >> report.md
 
-    - name: Create CML Report
+    - name: Create CML Comment on Pull Request
       env:
         REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cml comment create report.md
-
-    - name: Upload DVC artifacts to GCS (Optional, for DVC remote)
-      uses: google-github-actions/upload-cloud-storage@v2
-      with:
-        path: models/
-        destination: mlops-course-wide-link-461605-p9-unique/dvc-artifacts/${{ github.run_id }}/
-        parent: false
