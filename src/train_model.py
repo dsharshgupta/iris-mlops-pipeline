@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 import joblib
@@ -22,7 +22,7 @@ def train_iris_model(data_path='data/iris.csv'):
     
     run_id = None
     
-    # Check if there is an active MLflow run
+    # Check if there is an active MLflow run to get its ID
     if mlflow.active_run():
         run_id = mlflow.active_run().info.run_id
         mlflow.log_params(params)
@@ -32,8 +32,12 @@ def train_iris_model(data_path='data/iris.csv'):
     X = df[feature_cols]
     y = df['species']
     
+    # **FIX 1: Add LabelEncoder for robust label handling**
+    encoder = LabelEncoder()
+    y_encoded = encoder.fit_transform(y)
+    
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=params['test_size'], random_state=params['random_state'], stratify=y
+        X, y_encoded, test_size=params['test_size'], random_state=params['random_state'], stratify=y_encoded
     )
     
     scaler = StandardScaler()
@@ -54,17 +58,22 @@ def train_iris_model(data_path='data/iris.csv'):
         mlflow.log_metric('recall_weighted', report['weighted avg']['recall'])
         mlflow.log_metric('f1_weighted', report['weighted avg']['f1-score'])
         mlflow.sklearn.log_model(model, "iris_model")
+        
+        # Save and log the scaler and encoder as artifacts
         scaler_path = joblib.dump(scaler, 'models/scaler.pkl')[0]
-        mlflow.log_artifact(scaler_path, "scaler")
+        encoder_path = joblib.dump(encoder, 'models/label_encoder.pkl')[0]
+        mlflow.log_artifact(scaler_path, "preprocessing")
+        mlflow.log_artifact(encoder_path, "preprocessing")
 
+    # **FIX 2: Ensure all model files are always saved locally**
     os.makedirs('models', exist_ok=True)
     joblib.dump(model, 'models/iris_model.pkl')
+    joblib.dump(scaler, 'models/scaler.pkl')
+    joblib.dump(encoder, 'models/label_encoder.pkl')
     
     metrics = {
         'accuracy': accuracy,
-        'classification_report': report,
-        'test_size': len(y_test),
-        'train_size': len(y_train)
+        'classification_report': report
     }
     
     with open('models/metrics.json', 'w') as f:
