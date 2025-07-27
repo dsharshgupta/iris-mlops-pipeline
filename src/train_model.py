@@ -21,8 +21,14 @@ def train_iris_model(data_path='data/iris.csv'):
         'test_size': 0.2
     }
     
+    # This variable will store the run ID
+    run_id = None
+
     # Start an MLflow run
     with mlflow.start_run() as run:
+        # Get the run ID to pass to the next step
+        run_id = run.info.run_id
+
         # Log parameters
         mlflow.log_params(params)
         
@@ -54,7 +60,9 @@ def train_iris_model(data_path='data/iris.csv'):
 
         # Log model and scaler as artifacts
         mlflow.sklearn.log_model(model, "iris_model")
-        mlflow.log_artifact(joblib.dump(scaler, 'models/scaler.pkl')[0], "scaler")
+        # joblib.dump returns a list, so we get the first element for the path
+        scaler_path = joblib.dump(scaler, 'models/scaler.pkl')[0]
+        mlflow.log_artifact(scaler_path, "scaler")
 
         os.makedirs('models', exist_ok=True)
         joblib.dump(model, 'models/iris_model.pkl')
@@ -70,12 +78,15 @@ def train_iris_model(data_path='data/iris.csv'):
             json.dump(metrics, f, indent=2)
         
         print(f"Model trained with accuracy: {accuracy:.4f}")
-        print(f"MLflow Run ID: {run.info.run_id}")
+        print(f"MLflow Run ID: {run_id}")
+
+    # **NEW:** Save the run_id to a file
+    if run_id:
+        with open('models/run_id.txt', 'w') as f:
+            f.write(run_id)
         
     return model, scaler, metrics
 
 if __name__ == "__main__":
-    # Set MLflow experiment
-    # The tracking URI will be set by the environment variable in the CI/CD pipeline
     mlflow.set_experiment("iris-classification-cml")
     train_iris_model()
