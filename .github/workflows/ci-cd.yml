@@ -64,6 +64,7 @@ jobs:
         echo "|-----------------|-----------------------|" >> report.md
         
         # Read the summary JSON and format each result as a table row
+        # FIX: Corrected the f-string syntax by removing asterisks
         python -c "import json; results = json.load(open('models/all_experiment_results.json')); \
         for name, data in results.items(): \
             level = data['poisoning_level'] * 100; \
