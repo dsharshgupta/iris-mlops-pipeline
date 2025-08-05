@@ -13,26 +13,33 @@ def run_experiment(poisoning_level):
     """
     print(f"--- Running experiment with {poisoning_level*100}% data poisoning ---")
 
-    # Set the experiment name
+    # Set the experiment name for all poisoning runs
     mlflow.set_experiment("iris-poisoning-experiments")
 
+    # Start a new MLflow run for this specific poisoning level
     with mlflow.start_run(run_name=f"poisoning_{int(poisoning_level*100)}%"):
-        # Log the poisoning level as a parameter
+        # Log the poisoning level as a parameter for easy filtering in the UI
         mlflow.log_param("poisoning_level", poisoning_level)
 
-        # Load and poison data
+        # Load original data and create a poisoned version
         df = load_iris_data()
         df_poisoned = poison_data(df.copy(), poisoning_level)
         poisoned_data_path = f'data/iris_poisoned_{int(poisoning_level*100)}.csv'
         df_poisoned.to_csv(poisoned_data_path, index=False)
         
-        # Train model on poisoned data (metrics are logged within this function)
+        # Train the model on the (potentially) poisoned data
+        # The train_model function will log its own metrics to our active run
         model, scaler, training_metrics = train_iris_model(data_path=poisoned_data_path)
 
-        # Evaluate model (metrics and artifacts are logged within this function)
+        # Evaluate the model on the full (poisoned) dataset
+        # The evaluate_model function will also log its metrics and artifacts
         evaluation_metrics = evaluate_model(data_path=poisoned_data_path)
 
-        # Store results locally as well
+        # Print the final accuracy to the console log for GitHub Actions
+        final_accuracy = evaluation_metrics.get('full_dataset_accuracy', 0)
+        print(f"Poisoning Level: {poisoning_level*100}%, Full Dataset Accuracy: {final_accuracy:.4f}")
+
+        # Store a summary of the results locally
         results = {
             'poisoning_level': poisoning_level,
             'training_metrics': training_metrics,
@@ -43,25 +50,26 @@ def run_experiment(poisoning_level):
         with open(output_file, 'w') as f:
             json.dump(results, f, indent=2)
 
-        # Log the results file as an artifact
+        # Log the detailed JSON results as an artifact in MLflow
         mlflow.log_artifact(output_file, "results")
 
-        print(f"--- Experiment for {poisoning_level*100}% poisoning complete. Run ID: {mlflow.active_run().info.run_id} ---")
+        print(f"--- Experiment for {poisoning_level*100}% poisoning complete. MLflow Run ID: {mlflow.active_run().info.run_id} ---")
         return results
 
 if __name__ == "__main__":
-    # Define poisoning levels, including a 0% baseline
+    # Define the poisoning levels to test, including a 0% baseline
     poisoning_levels = [0.0, 0.05, 0.10, 0.50]
     all_results = {}
 
+    # Run the experiment for each level
     for level in poisoning_levels:
         result = run_experiment(level)
         all_results[f"{int(level*100)}%_poisoning"] = result
 
-    # Save a summary of all experiments
+    # Save a final summary of all experiments to a single file
     with open('models/all_experiment_results.json', 'w') as f:
         json.dump(all_results, f, indent=2)
 
     print("\n--- All experiments complete ---")
     print("Results summary saved to models/all_experiment_results.json")
-    print("Run 'mlflow ui' to view the results in the MLflow dashboard.")
+    print("You can now view the detailed results in the MLflow UI by running 'mlflow ui'")
