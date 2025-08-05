@@ -53,13 +53,21 @@ jobs:
         echo "| Poisoning Level | Full Dataset Accuracy |" >> report.md
         echo "|-----------------|-----------------------|" >> report.md
         
-        # Read the summary JSON and format each result as a table row
-        # FIXED: Removed asterisks from f-string format specifiers
-        python -c "import json; results = json.load(open('models/all_experiment_results.json')); \
-        for name, data in results.items(): \
-            level = data['poisoning_level'] * 100; \
-            acc = data['evaluation_metrics']['full_dataset_accuracy']; \
-            print(f'| {level:.0f}% | {acc:.4f} |')" >> report.md
+        # Create a temporary Python script to generate the table rows
+        cat > generate_report_rows.py << 'EOF'
+        import json
+        
+        with open('models/all_experiment_results.json', 'r') as f:
+            results = json.load(f)
+        
+        for name, data in results.items():
+            level = data['poisoning_level'] * 100
+            acc = data['evaluation_metrics']['full_dataset_accuracy']
+            print(f'| {level:.0f}% | {acc:.4f} |')
+        EOF
+        
+        # Run the Python script and append results to the report
+        python generate_report_rows.py >> report.md
         
         echo "" >> report.md
         echo "### Confusion Matrix (Baseline - 0% Poisoning)" >> report.md
@@ -67,6 +75,9 @@ jobs:
         echo '![](./models/confusion_matrix.png)' >> report.md
         echo "" >> report.md
         echo "Detailed logs and artifacts for each run are available in the [MLflow UI](${{ secrets.MLFLOW_TRACKING_URI }})." >> report.md
+        
+        # Clean up the temporary script
+        rm generate_report_rows.py
     - name: Create or Update CML Comment on Pull Request
       env:
         REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
