@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Poisoning Experiments
 
 on:
   push:
@@ -8,12 +8,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-and-train:
+  test-and-train-experiments:
     runs-on: ubuntu-latest
     env:
-      # Use the secret for the remote MLflow tracking server URI
+      # MLflow configuration using secrets
       MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-      # GCS bucket for storing MLflow artifacts
       MLFLOW_ARTIFACT_ROOT: "gs://mlops-course-wide-link-461605-p9-unique/mlflow-artifacts"
 
     permissions:
@@ -35,13 +34,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run data validation tests
-      run: python -m pytest tests/test_data_validation.py -v
-
-    - name: Run model evaluation tests
-      run: python -m pytest tests/test_model_evaluation.py -v
+    - name: Run Pytest for Data and Model Validation
+      run: |
+        python -m pytest tests/test_data_validation.py -v
+        python -m pytest tests/test_model_evaluation.py -v
       
-    - name: Authenticate with GCP
+    - name: Authenticate with GCP for MLflow Artifacts
       uses: google-github-actions/auth@v2
       with:
         credentials_json: '${{ secrets.GCP_SA_KEY }}'
@@ -49,29 +47,38 @@ jobs:
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Setup CML
+    - name: Setup CML for reporting
       uses: iterative/setup-cml@v1
 
-    - name: Run ML pipeline with MLflow and generate report
+    - name: Run All Data Poisoning Experiments
       run: |
-        # These scripts are now updated to handle MLflow logging
-        python src/data_loader.py
-        python src/train_model.py
-        python src/evaluate_model.py
+        # This single script now handles all training, evaluation, and logging
+        python run_experiments.py
 
-        # Generate the CML report markdown file
-        echo "## Model Performance Report" > report.md
+    - name: Generate CML Report from Experiment Results
+      run: |
+        # Start the report file
+        echo "## 📊 Data Poisoning Experiment Results" > report.md
         echo "" >> report.md
-        echo "### Training Metrics (on test split)" >> report.md
-        python -c "import json; m = json.load(open('models/metrics.json')); print(f'- Accuracy: {m[\"accuracy\"]:.4f}')" >> report.md
+        echo "| Poisoning Level | Full Dataset Accuracy |" >> report.md
+        echo "|-----------------|-----------------------|" >> report.md
+        
+        # Read the summary JSON and format each result as a table row
+        python -c "import json; results = json.load(open('models/all_experiment_results.json')); \
+        for name, data in results.items(): \
+            level = data['poisoning_level'] * 100; \
+            acc = data['evaluation_metrics']['full_dataset_accuracy']; \
+            print(f'| {level:.0f}% | {acc:.4f} |')" >> report.md
+        
         echo "" >> report.md
-        echo "### Evaluation Metrics (on full dataset)" >> report.md
-        python -c "import json; m = json.load(open('models/evaluation_metrics.json')); print(f'- Accuracy: {m[\"full_dataset_accuracy\"]:.4f}\\n- Precision: {m[\"precision\"]:.4f}\\n- Recall: {m[\"recall\"]:.4f}\\n- F1-Score: {m[\"f1_score\"]:.4f}')" >> report.md
-        echo "" >> report.md
-        echo "### Confusion Matrix" >> report.md
+        echo "### Confusion Matrix (Baseline - 0% Poisoning)" >> report.md
+        # The confusion matrix from the last run (0%) will be used for the report
         echo '![](./models/confusion_matrix.png)' >> report.md
+        echo "" >> report.md
+        echo "Detailed logs and artifacts for each run are available in the [MLflow UI](${{ secrets.MLFLOW_TRACKING_URI }})." >> report.md
 
-    - name: Create CML Comment on Pull Request
+
+    - name: Create or Update CML Comment on Pull Request
       env:
         REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
