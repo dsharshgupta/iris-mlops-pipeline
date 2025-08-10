@@ -9,6 +9,7 @@ import os
 import json
 import mlflow
 import mlflow.sklearn
+from mlflow.exceptions import MlflowException
 
 def train_iris_model(data_path='data/iris.csv'):
     """
@@ -61,20 +62,23 @@ def train_iris_model(data_path='data/iris.csv'):
     with open('models/metrics.json', 'w') as f:
         json.dump(metrics, f, indent=2)
 
-    # --- Log to MLflow (If Active) ---
-    mlflow.set_experiment("iris-fairness-experiment")
-    with mlflow.start_run():
-        print("Logging to active MLflow run...")
-        mlflow.log_params(params)
-        mlflow.log_metric('training_accuracy', accuracy)
-        mlflow.log_metric('training_f1_weighted', report['weighted avg']['f1-score'])
-        
-        mlflow.sklearn.log_model(model, "iris_model")
-        mlflow.log_artifact('models/scaler.pkl', "preprocessing")
-        mlflow.log_artifact('models/label_encoder.pkl', "preprocessing")
-        mlflow.log_artifact('models/metrics.json', "training_reports")
+    # --- Log to MLflow (If Possible) ---
+    try:
+        mlflow.set_experiment("iris-fairness-experiment")
+        with mlflow.start_run():
+            print("Logging to active MLflow run...")
+            mlflow.log_params(params)
+            mlflow.log_metric('training_accuracy', accuracy)
+            mlflow.log_metric('training_f1_weighted', report['weighted avg']['f1-score'])
+            
+            mlflow.sklearn.log_model(model, "iris_model")
+            mlflow.log_artifact('models/scaler.pkl', "preprocessing")
+            mlflow.log_artifact('models/label_encoder.pkl', "preprocessing")
+            mlflow.log_artifact('models/metrics.json', "training_reports")
+    except MlflowException as e:
+        print(f"WARNING: Could not connect to MLflow server. Skipping logging. Error: {e}")
 
-        print(f"Model trained with accuracy: {accuracy:.4f}")
+    print(f"Model trained with accuracy: {accuracy:.4f}")
         
     return model, scaler, metrics
 
