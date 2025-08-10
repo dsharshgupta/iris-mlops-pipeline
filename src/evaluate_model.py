@@ -66,7 +66,8 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
         explainer = shap.KernelExplainer(model.predict_proba, X_summary)
         shap_values = explainer.shap_values(X_scaled)
 
-        shap.summary_plot(shap_values[2], X_scaled, feature_names=X.columns, show=False)
+        # Corrected SHAP plot call
+        shap.summary_plot(shap_values[2], X, show=False)
         plt.title('SHAP Summary Plot for Virginica')
         shap_plot_path = 'models/shap_summary_plot_virginica.png'
         plt.savefig(shap_plot_path)
