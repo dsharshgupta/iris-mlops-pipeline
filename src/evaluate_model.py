@@ -14,14 +14,14 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
     model = joblib.load(model_path)
     scaler = joblib.load(scaler_path)
     df = pd.read_csv(data_path)
-    
+
     X = df[['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)', 'location']]
     y = df['species']
     location_sensitive = df['location']
-            
+
     X_scaled = scaler.transform(X)
     y_pred = model.predict(X_scaled)
-            
+
     accuracy = accuracy_score(y, y_pred)
     precision, recall, f1, _ = precision_recall_fscore_support(y, y_pred, average='weighted')
 
@@ -46,7 +46,7 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
 
             print("\n--- Fairlearn Metrics (Grouped by Location) ---")
             print(grouped_on_location.by_group)
-            
+
             mlflow.log_dict(grouped_on_location.by_group.to_dict(), "fairness_metrics_by_location.json")
             # --- End of Fairlearn Part ---
 
@@ -56,19 +56,20 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
             plt.title('Confusion Matrix on Full Dataset')
             plt.ylabel('Actual')
             plt.xlabel('Predicted')
-                
+
             confusion_matrix_path = 'models/confusion_matrix.png'
             plt.savefig(confusion_matrix_path)
             plt.close()
             mlflow.log_artifact(confusion_matrix_path, "evaluation_results")
 
-            # SHAP explainer
-            X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
-            X_summary = shap.kmeans(X_scaled_df, 10)
-            explainer = shap.KernelExplainer(model.predict_proba, X_summary)
-            shap_values = explainer.shap_values(X_scaled_df)
+            # --- SHAP explainer ---
+            # Using the ExactExplainer is more robust for this model type.
+            # We pass the model's prediction function and the scaled data.
+            explainer = shap.Explainer(model.predict_proba, X_scaled)
+            shap_values = explainer(X_scaled)
 
-            shap.summary_plot(shap_values[2], X_scaled_df, show=False)
+            # For the plot, we need to provide the base values and the feature names.
+            shap.summary_plot(shap_values.values[:,:,2], X, feature_names=X.columns, show=False)
             plt.title('SHAP Summary Plot for Virginica')
             shap_plot_path = 'models/shap_summary_plot_virginica.png'
             plt.savefig(shap_plot_path)
