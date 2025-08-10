@@ -25,7 +25,7 @@ def train_iris_model(data_path='data/iris.csv'):
     
     # --- Feature Engineering and Model Training ---
     feature_cols = ['sepal length (cm)', 'sepal width (cm)', 
-                   'petal length (cm)', 'petal width (cm)']
+                   'petal length (cm)', 'petal width (cm)', 'location']
     X = df[feature_cols]
     y = df['species']
     
