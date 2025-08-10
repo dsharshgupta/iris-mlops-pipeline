@@ -10,7 +10,7 @@ def test_data_shape():
     """Test if data has correct shape"""
     df = load_iris_data()
     assert df.shape[0] == 150
-    assert df.shape[1] == 6
+    assert df.shape[1] == 7
 
 def test_no_missing_values():
     """Test for missing values"""
