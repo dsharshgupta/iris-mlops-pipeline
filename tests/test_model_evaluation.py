@@ -49,7 +49,7 @@ def test_sanity_check():
 
     model, scaler, _ = train_iris_model()
     
-    # Create a sample DataFrame for prediction
+    # Create a sample DataFrame for prediction, including the 'location' column
     sample = pd.DataFrame([[5.1, 3.5, 1.4, 0.2, 0]], columns=['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)', 'location'])
     
     scaled_sample = scaler.transform(sample)
