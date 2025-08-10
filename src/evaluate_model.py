@@ -62,13 +62,17 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
             plt.close()
             mlflow.log_artifact(confusion_matrix_path, "evaluation_results")
 
-            # SHAP explainer
-            X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
-            X_summary = shap.kmeans(X_scaled_df, 10)
-            explainer = shap.KernelExplainer(model.predict_proba, X_summary)
-            shap_values = explainer.shap_values(X_scaled_df)
+            # --- SHAP explainer ---
+            # It is more robust to use numpy arrays for the SHAP calculation
+            # and provide feature names explicitly only for the plot.
+            predict_fn = lambda x: model.predict_proba(x)
+            X_summary = shap.kmeans(X_scaled, 10)
+            explainer = shap.KernelExplainer(predict_fn, X_summary)
+            shap_values = explainer.shap_values(X_scaled)
 
-            shap.summary_plot(shap_values[2], X_scaled_df, show=False)
+            # For the plot, pass the SHAP values, the scaled features (as a numpy array),
+            # and the feature names from the original DataFrame.
+            shap.summary_plot(shap_values[2], X_scaled, feature_names=X.columns.tolist(), show=False)
             plt.title('SHAP Summary Plot for Virginica')
             shap_plot_path = 'models/shap_summary_plot_virginica.png'
             plt.savefig(shap_plot_path)
