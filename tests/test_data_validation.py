@@ -19,7 +19,7 @@ def test_no_missing_values():
 
 def test_species_distribution():
     """Test species distribution"""
-    df = load_.iris_data()
+    df = load_iris_data()
     species_counts = df['species'].value_counts()
     assert all(species_counts == 50)
 
