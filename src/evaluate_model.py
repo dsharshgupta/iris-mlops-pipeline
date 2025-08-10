@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import mlflow
 import shap
-from fairlearn.explainers import TabularExplainer
+# Corrected import statement
+from fairlearn.metrics import MetricFrame
 
 def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scaler.pkl', data_path='data/iris.csv'):
     """Evaluates the model and logs metrics to an active MLflow run."""
@@ -16,6 +17,7 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
     
     X = df[['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)', 'location']]
     y = df['species']
+    location = df['location']
             
     X_scaled = scaler.transform(X)
     y_pred = model.predict(X_scaled)
@@ -41,12 +43,17 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
         plt.close()
         mlflow.log_artifact(confusion_matrix_path, "evaluation_results")
 
-        # Fairlearn explainer
-        explainer = TabularExplainer(model, X_scaled, features=X.columns, classes=['setosa', 'versicolor', 'virginica'])
-        global_explanation = explainer.explain_global(X_scaled)
+        # Fairlearn explainer logic needs to be adapted as TabularExplainer is not the right tool for SHAP
+        # Here we will proceed with SHAP directly for the explanation as intended.
+        
+        # 1. Create a SHAP explainer
+        explainer = shap.KernelExplainer(model.predict_proba, X_scaled)
 
-        # SHAP plot for Virginica
-        shap.summary_plot(global_explanation.get_obj()['per_class_values'][2], X_scaled, feature_names=X.columns, show=False)
+        # 2. Get SHAP values
+        shap_values = explainer.shap_values(X_scaled)
+
+        # SHAP plot for Virginica (class 2)
+        shap.summary_plot(shap_values[2], X_scaled, feature_names=X.columns, show=False)
         plt.title('SHAP Summary Plot for Virginica')
         shap_plot_path = 'models/shap_summary_plot_virginica.png'
         plt.savefig(shap_plot_path)
