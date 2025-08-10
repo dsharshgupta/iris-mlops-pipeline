@@ -5,6 +5,8 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, con
 import matplotlib.pyplot as plt
 import seaborn as sns
 import mlflow
+import shap
+from fairlearn.explainers import TabularExplainer
 
 def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scaler.pkl', data_path='data/iris.csv'):
     """Evaluates the model and logs metrics to an active MLflow run."""
@@ -12,7 +14,7 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
     scaler = joblib.load(scaler_path)
     df = pd.read_csv(data_path)
     
-    X = df[['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']]
+    X = df[['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)', 'location']]
     y = df['species']
             
     X_scaled = scaler.transform(X)
@@ -38,6 +40,18 @@ def evaluate_model(model_path='models/iris_model.pkl', scaler_path='models/scale
         plt.savefig(confusion_matrix_path)
         plt.close()
         mlflow.log_artifact(confusion_matrix_path, "evaluation_results")
+
+        # Fairlearn explainer
+        explainer = TabularExplainer(model, X_scaled, features=X.columns, classes=['setosa', 'versicolor', 'virginica'])
+        global_explanation = explainer.explain_global(X_scaled)
+
+        # SHAP plot for Virginica
+        shap.summary_plot(global_explanation.get_obj()['per_class_values'][2], X_scaled, feature_names=X.columns, show=False)
+        plt.title('SHAP Summary Plot for Virginica')
+        shap_plot_path = 'models/shap_summary_plot_virginica.png'
+        plt.savefig(shap_plot_path)
+        plt.close()
+        mlflow.log_artifact(shap_plot_path, "evaluation_results")
 
     evaluation_metrics = {'full_dataset_accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1}
     with open('models/evaluation_metrics.json', 'w') as f:
