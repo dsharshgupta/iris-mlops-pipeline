@@ -25,7 +25,7 @@ def train_iris_model(data_path='data/iris.csv'):
     
     # --- Feature Engineering and Model Training ---
     feature_cols = ['sepal length (cm)', 'sepal width (cm)', 
-                   'petal length (cm)', 'petal width (cm)']
+                   'petal length (cm)', 'petal width (cm)', 'location']
     X = df[feature_cols]
     y = df['species']
     
@@ -49,7 +49,6 @@ def train_iris_model(data_path='data/iris.csv'):
     report = classification_report(y_test, y_pred, output_dict=True)
     
     # --- Save Artifacts Locally (Guaranteed) ---
-    # This block now runs every time, ensuring tests pass.
     os.makedirs('models', exist_ok=True)
     joblib.dump(model, 'models/iris_model.pkl')
     joblib.dump(scaler, 'models/scaler.pkl')
@@ -63,18 +62,24 @@ def train_iris_model(data_path='data/iris.csv'):
         json.dump(metrics, f, indent=2)
 
     # --- Log to MLflow (If Active) ---
-    if mlflow.active_run():
-        print("Logging to active MLflow run...")
-        mlflow.log_params(params)
-        mlflow.log_metric('training_accuracy', accuracy)
-        mlflow.log_metric('training_f1_weighted', report['weighted avg']['f1-score'])
-        
-        # Log artifacts that were just saved
-        mlflow.sklearn.log_model(model, "iris_model")
-        mlflow.log_artifact('models/scaler.pkl', "preprocessing")
-        mlflow.log_artifact('models/label_encoder.pkl', "preprocessing")
-        mlflow.log_artifact('models/metrics.json', "training_reports")
+    if not mlflow.active_run():
+        mlflow.start_run()
+
+    print("Logging to active MLflow run...")
+    mlflow.log_params(params)
+    mlflow.log_metric('training_accuracy', accuracy)
+    mlflow.log_metric('training_f1_weighted', report['weighted avg']['f1-score'])
+    
+    mlflow.sklearn.log_model(model, "iris_model")
+    mlflow.log_artifact('models/scaler.pkl', "preprocessing")
+    mlflow.log_artifact('models/label_encoder.pkl', "preprocessing")
+    mlflow.log_artifact('models/metrics.json', "training_reports")
 
     print(f"Model trained with accuracy: {accuracy:.4f}")
-        
+    
+    mlflow.end_run()
+
     return model, scaler, metrics
+
+if __name__ == '__main__':
+    train_iris_model()
